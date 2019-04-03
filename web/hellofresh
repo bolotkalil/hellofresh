@@ -1,0 +1,59 @@
+#!/usr/bin/env php
+
+<?php
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+use Doctrine\DBAL\Migrations\Configuration\Configuration;
+use Hellofresh\Service\Database\Service;
+use League\Container\Container;
+use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Helper\HelperSet;
+use Symfony\Component\Dotenv\Dotenv;
+
+$config = new \Hellofresh\Service\Database\Config();
+
+$container = new Container();
+(new Service())->register($container, $config);
+
+$db = $container->get($config::getServiceName());
+
+(new Dotenv())->load(__DIR__.'/.env');
+
+$helperSet = new HelperSet(array(
+    'db' => new \Doctrine\DBAL\Tools\Console\Helper\ConnectionHelper($db),
+    'dialog' => new \Symfony\Component\Console\Helper\QuestionHelper(),
+));
+
+$console = new Application('Hellofresh', '1.0');
+$console->setHelperSet($helperSet);
+
+$migrationConfig = new Configuration($helperSet->get('db')->getConnection());
+$migrationConfig->setMigrationsNamespace(getenv('DB_MIGRATION_NAMESPACE'));
+$migrationConfig->setMigrationsTableName(getenv('DB_MIGRATION_TABLE_NAME'));
+$migrationConfig->setMigrationsDirectory(getenv('DB_MIGRATION_DIRECTORY'));
+$migrationConfig->setName(getenv('DB_MIGRATION_NAME'));
+
+$diff = new \Doctrine\DBAL\Migrations\Tools\Console\Command\DiffCommand;
+$diff->setMigrationConfiguration($migrationConfig);
+$execute = new \Doctrine\DBAL\Migrations\Tools\Console\Command\ExecuteCommand;
+$execute->setMigrationConfiguration($migrationConfig);
+$generate = new \Doctrine\DBAL\Migrations\Tools\Console\Command\GenerateCommand;
+$generate->setMigrationConfiguration($migrationConfig);
+$migrate = new \Doctrine\DBAL\Migrations\Tools\Console\Command\MigrateCommand;
+$migrate->setMigrationConfiguration($migrationConfig);
+$status = new \Doctrine\DBAL\Migrations\Tools\Console\Command\StatusCommand;
+$status->setMigrationConfiguration($migrationConfig);
+$version = new \Doctrine\DBAL\Migrations\Tools\Console\Command\VersionCommand;
+$version->setMigrationConfiguration($migrationConfig);
+
+$console->addCommands(array(
+    $diff,
+    $execute,
+    $generate,
+    $migrate,
+    $status,
+    $version
+));
+
+$console->run();
